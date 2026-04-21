@@ -9,6 +9,7 @@ const { scoreCandidates, buildDecision } = require("../services/scoring");
 const { prepareImageForAI } = require("../utils/imageTools");
 const { searchWeb } = require("../services/webSearch");
 const { searchImages } = require("../services/imageSearch");
+const { enrichProduct } = require("../services/productEnricher");
 const router = express.Router();
 const uploadDir = path.join(__dirname, "..", "uploads");
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
@@ -120,55 +121,44 @@ if (aiResult?.candidate) {
     // =========================
     // 🔥 SEARCH SECTION (SAFE)
     // =========================
-    let webLinks = [];
-    let images = [];
-    const searchBrand =
-      decision.bestMatch?.brand ||
-      aiResult?.candidate?.brand ||
-      "";
-    const searchProduct =
-      decision.bestMatch?.product_name ||
-      aiResult?.candidate?.product_name ||
-      barcode ||
-      "";
-    try {
-      if (searchBrand || searchProduct) {
-        webLinks = await searchWeb({
-          brand: searchBrand,
-          product: searchProduct
-        });
-        images = await searchImages({
-          brand: searchBrand,
-          product: searchProduct
-        });
-      }
-    } catch (e) {
-      console.log("⚠️ Search failed, using fallback");
-    }
-    // 🔥 Fallback links (always show something)
-    if (!webLinks.length) {
-      const query = encodeURIComponent(`${searchBrand} ${searchProduct}`);
-      webLinks = [
-        {
-          title: "Search on Google",
-          url: `https://www.google.com/search?q=${query}`
-        },
-        {
-          title: "View Images",
-          url: `https://www.google.com/search?tbm=isch&q=${query}`
-        }
-      ];
-    }
-    // 🔥 Fallback image (if barcode DB has one)
-    if (!images.length && decision.bestMatch?.image_url) {
-      images = [
-        {
-          url: decision.bestMatch.image_url,
-          thumbnail: decision.bestMatch.image_url,
-          title: "Product Image"
-        }
-      ];
-    }
+let webLinks = [];
+let images = [];
+let price_range = null;
+let model = null;
+let product_link = null;
+const searchBrand =
+  decision.bestMatch?.brand ||
+  aiResult?.candidate?.brand ||
+  "";
+const searchProduct =
+  decision.bestMatch?.product_name ||
+  aiResult?.candidate?.product_name ||
+  barcode ||
+ "";
+// 🔥 ENRICH PRODUCT (PRICE + MODEL)
+const enriched = await enrichProduct({
+  brand: searchBrand,
+  product: searchProduct,
+  barcode
+});
+price_range = enriched.price_range;
+model = enriched.model;
+// 🔥 WEB + IMAGE SEARCH
+if (searchBrand || searchProduct) {
+  webLinks = await searchWeb({
+    brand: searchBrand,
+    product: searchProduct
+  });
+  // 🔥 pick BEST product link
+  product_link =
+    decision.bestMatch?.product_url ||
+    webLinks[0]?.url ||
+    null;
+  // 🔥 images fallback
+  images = [
+    decision.bestMatch?.image_url || "",
+  ].filter(Boolean);
+}
     // =========================
     // ✅ FINAL RESPONSE
     // =========================
@@ -176,13 +166,18 @@ res.json({
   ok: true,
   status: decision.status,
   confidence: decision.confidence,
-  authenticity: decision.status === "verified" ? "AUTHENTIC ✅" : "NOT VERIFIED ⚠️",
+  authenticity:
+    decision.status === "verified"
+      ? "AUTHENTIC ✅"
+      : "NOT VERIFIED ⚠️",
   best_match: decision.bestMatch,
   alternatives: decision.alternatives,
+  // 🔥 NEW SMART DATA
+  price_range,
+  model,
+  product_link,
   web_links: webLinks,
-  images: images,
-  product_link: decision.bestMatch?.product_url || "",
-  model: decision.bestMatch?.model || aiResult?.candidate?.model || "",
+  images,
   extracted: {
     barcode,
     qr,
