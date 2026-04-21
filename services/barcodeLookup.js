@@ -1,27 +1,26 @@
 const axios = require("axios");
 async function lookupBarcode(barcode) {
   try {
-    const url = `https://world.openfoodfacts.net/api/v2/product/${encodeURIComponent(
-      barcode
-    )}?fields=code,product_name,brands,categories,image_url`;
+    const url = `https://api.upcitemdb.com/prod/trial/lookup?upc=${encodeURIComponent(barcode)}`;
     const { data } = await axios.get(url, {
       timeout: 12000,
       headers: {
         "User-Agent": "EazyScanVerify/1.0"
       }
     });
-    if (data?.status === 1 && data?.product) {
+    if (data?.code === "OK" && Array.isArray(data.items) && data.items.length > 0) {
       return {
         found: true,
-        candidates: [
-          {
-            code: data.code || barcode,
-            product_name: data.product.product_name || "",
-            brand: data.product.brands || "",
-            category: data.product.categories || "",
-            image_url: data.product.image_url || ""
-          }
-        ]
+        candidates: data.items.map((item) => ({
+          code: item.upc || item.ean || barcode,
+          product_name: item.title || "",
+          brand: item.brand || "",
+          category: item.category || "",
+          model: item.model || "",
+          image_url: item.images?.[0] || "",
+          product_url: item.offers?.[0]?.link || "",
+          raw: item
+        }))
       };
     }
     return { found: false, candidates: [] };

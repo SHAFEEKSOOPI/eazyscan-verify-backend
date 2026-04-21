@@ -72,29 +72,34 @@ router.post("/verify", upload.single("image"), async (req, res) => {
     // ✅ Barcode candidates
     if (barcodeResult?.candidates?.length) {
       for (const item of barcodeResult.candidates) {
-        candidates.push({
-          source: "barcode_lookup",
-          product_name: item.product_name || "",
-          brand: item.brand || "",
-          category: item.category || "",
-          code: item.code || barcode,
-          image_url: item.image_url || "",
-          raw: item
-        });
-      }
-    }
-    // ✅ AI candidate
-    if (aiResult?.candidate) {
       candidates.push({
-        source: "ai_vision",
-        product_name: aiResult.candidate.product_name || "",
-        brand: normalizeBrand(aiResult.candidate.brand),
-        category: aiResult.candidate.category || "",
-        code: aiResult.candidate.code || barcode || "",
-        image_url: "",
-        raw: aiResult.candidate
-      });
-    }
+      source: "barcode_lookup",
+      product_name: item.product_name || "",
+      brand: item.brand || "",
+      category: item.category || "",
+      code: item.code || barcode,
+      image_url: item.image_url || "",
+      product_url: item.product_url || "",
+      model: item.model || "",
+      raw: item
+    });
+  }
+}
+
+// ✅ AI candidate
+if (aiResult?.candidate) {
+  candidates.push({
+    source: "ai_vision",
+    product_name: aiResult.candidate.product_name || "",
+    brand: normalizeBrand(aiResult.candidate.brand),
+    category: aiResult.candidate.category || "",
+    code: aiResult.candidate.code || barcode || "",
+    image_url: "",
+    product_url: "",
+    model: aiResult.candidate.model || "",
+    raw: aiResult.candidate
+  });
+}
     // ✅ scoring
     const scored = scoreCandidates({
       candidates,
@@ -167,22 +172,25 @@ router.post("/verify", upload.single("image"), async (req, res) => {
     // =========================
     // ✅ FINAL RESPONSE
     // =========================
-    res.json({
-      ok: true,
-      status: decision.status,
-      confidence: decision.confidence,
-      authenticity: decision.status === "verified" ? "AUTHENTIC ✅" : "NOT VERIFIED ⚠️",
-      best_match: decision.bestMatch,
-      alternatives: decision.alternatives,
-      web_links: webLinks,
-      images: images,
-      extracted: {
-        barcode,
-        qr,
-        filters,
-        ai: aiResult || null
-      }
-    });
+res.json({
+  ok: true,
+  status: decision.status,
+  confidence: decision.confidence,
+  authenticity: decision.status === "verified" ? "AUTHENTIC ✅" : "NOT VERIFIED ⚠️",
+  best_match: decision.bestMatch,
+  alternatives: decision.alternatives,
+  web_links: webLinks,
+  images: images,
+  product_link: decision.bestMatch?.product_url || "",
+  model: decision.bestMatch?.model || aiResult?.candidate?.model || "",
+  extracted: {
+    barcode,
+    qr,
+    filters,
+    ai: aiResult || null
+  }
+});
+
   } catch (error) {
     console.error("🔥 FULL ERROR:", error);
     res.status(500).json({

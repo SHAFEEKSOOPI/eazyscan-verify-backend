@@ -53,7 +53,8 @@ Return ONLY JSON.
           code: "",
           style: "",
           color: "",
-          confidence: 0.3
+          confidence: 0.3,
+	  
         },
         raw_text: text
       };
