@@ -71,17 +71,16 @@ router.post("/verify", upload.single("image"), async (req, res) => {
     ]);
     const candidates = [];
     // ✅ Barcode candidates
-    if (barcodeResult?.candidates?.length) {
-      for (const item of barcodeResult.candidates) {
-      candidates.push({
+if (barcodeResult?.candidates?.length) {
+  for (const item of barcodeResult.candidates) {
+    candidates.push({
       source: "barcode_lookup",
       product_name: item.product_name || "",
-      brand: item.brand || "",
+      brand: normalizeBrand(item.brand),
       category: item.category || "",
       code: item.code || barcode,
       image_url: item.image_url || "",
       product_url: item.product_url || "",
-      model: item.model || "",
       raw: item
     });
   }
@@ -96,8 +95,6 @@ if (aiResult?.candidate) {
     category: aiResult.candidate.category || "",
     code: aiResult.candidate.code || barcode || "",
     image_url: "",
-    product_url: "",
-    model: aiResult.candidate.model || "",
     raw: aiResult.candidate
   });
 }
@@ -151,9 +148,10 @@ if (searchBrand || searchProduct) {
   });
   // 🔥 pick BEST product link
   product_link =
-    decision.bestMatch?.product_url ||
-    webLinks[0]?.url ||
-    null;
+  decision.bestMatch?.product_url ||
+  webLinks.find(l => l.url.includes("amazon") || l.url.includes("myntra"))?.url ||
+  webLinks[0]?.url ||
+  null;
   // 🔥 images fallback
   images = [
     decision.bestMatch?.image_url || "",
