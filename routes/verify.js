@@ -127,58 +127,43 @@ router.post("/verify", upload.single("image"), async (req, res) => {
     // 🔥 WEB SEARCH
     // =========================
     let webLinks = [];
-    if (searchBrand || searchProduct) {
-      webLinks = await searchWeb({
-        brand: searchBrand,
-        product: searchProduct
-      });
-    }
-    // ✅ fallback links (VERY IMPORTANT)
-    if (!webLinks.length && searchProduct) {
-      webLinks = [
-        {
-          title: "Search on Google",
-          url: `https://www.google.com/search?q=${encodeURIComponent(searchBrand + " " + searchProduct)}`
-        },
-        {
-          title: "View Images",
-          url: `https://www.google.com/search?tbm=isch&q=${encodeURIComponent(searchBrand + " " + searchProduct)}`
-        }
-      ];
-    }
-    console.log("WEB LINKS:", webLinks);
-    // =========================
-    // 🔥 IMAGE FIX
-    // =========================
-    const productImage =
-      decision.bestMatch?.image_url ||
-      barcodeResult?.candidates?.[0]?.image_url ||
-      "";
-    const fallbackImage =
-      productImage ||
-      `https://source.unsplash.com/400x400/?${encodeURIComponent(searchProduct)}`;
-    // =========================
-    // ✅ RESPONSE
-    // =========================
-    res.json({
-      ok: true,
-      status: decision.status,
-      confidence: decision.confidence,
-      authenticity:
-        decision.status === "verified"
-          ? "AUTHENTIC ✅"
-          : "NOT VERIFIED ⚠️",
-      best_match: decision.bestMatch,
-      alternatives: decision.alternatives,
-      web_links: webLinks,
-      images: [fallbackImage],
-      extracted: {
-        barcode,
-        qr,
-        filters,
-        ai: aiResult || null
-      }
-    });
+let images = [];
+const searchBrand =
+  decision.bestMatch?.brand ||
+  aiResult?.candidate?.brand ||
+  "";
+const searchProduct =
+  decision.bestMatch?.product_name ||
+  aiResult?.candidate?.product_name ||
+  barcode ||
+  "";
+if (searchBrand || searchProduct) {
+  webLinks = await searchWeb({
+    brand: searchBrand,
+    product: searchProduct
+  });
+  images = await searchImages({
+    brand: searchBrand,
+    product: searchProduct
+  });
+}
+res.json({
+  ok: true,
+  status: decision.status,
+  confidence: decision.confidence,
+  authenticity: decision.status === "verified" ? "AUTHENTIC ✅" : "NOT VERIFIED ⚠️",
+  best_match: decision.bestMatch,
+  alternatives: decision.alternatives,
+  web_links: webLinks,
+  images: images,   // 🔥 REAL images now
+  extracted: {
+    barcode,
+    qr,
+    filters,
+    ai: aiResult || null
+  }
+});
+
   } catch (error) {
     console.error("🔥 FULL ERROR:", error);
     res.status(500).json({
