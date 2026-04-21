@@ -8,6 +8,7 @@ const { normalizeFilters, normalizeBarcode, normalizeBrand } = require("../servi
 const { scoreCandidates, buildDecision } = require("../services/scoring");
 const { prepareImageForAI } = require("../utils/imageTools");
 const { searchWeb } = require("../services/webSearch");
+const { searchImages } = require("../services/imageSearch");
 const router = express.Router();
 const uploadDir = path.join(__dirname, "..", "uploads");
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
