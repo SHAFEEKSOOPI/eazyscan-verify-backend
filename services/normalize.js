@@ -13,15 +13,8 @@ function normalizeFilters(filters) {
     category: normalizeText(filters.category)
   };
 }
-module.exports = {
-  normalizeBarcode,
-  normalizeFilters,
-  normalizeText
-};
-
 function normalizeBrand(raw) {
   const text = (raw || "").toLowerCase();
-
   if (
     text.includes("pvh") ||
     text.includes("ck") ||
@@ -34,3 +27,9 @@ function normalizeBrand(raw) {
   if (text.includes("zara")) return "Zara";
   return raw;
 }
+module.exports = {
+  normalizeBarcode,
+  normalizeFilters,
+  normalizeText,
+  normalizeBrand
+};

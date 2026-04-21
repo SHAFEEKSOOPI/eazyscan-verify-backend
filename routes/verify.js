@@ -82,7 +82,7 @@ router.post("/verify", upload.single("image"), async (req, res) => {
       }
     }
 
-const { normalizeBrand } = require("../services/normalize");
+const { normalizeFilters, normalizeBarcode, normalizeBrand } = require("../services/normalize");
 if (aiResult?.candidate) {
   candidates.push({
     source: "ai_vision",
