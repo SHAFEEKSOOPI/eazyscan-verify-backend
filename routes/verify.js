@@ -111,10 +111,20 @@ router.post("/verify", upload.single("image"), async (req, res) => {
     });
 
     let webLinks = [];
-	webLinks = await searchWeb({
-  	brand: decision.bestMatch?.brand || filters.brand || "",
-  	product: decision.bestMatch?.product_name || filters.product || barcode || ""
-    });
+	if (
+  	decision.bestMatch ||
+  	aiResult?.candidate?.product_name ||
+  	barcode
+	) {
+  	webLinks = await searchWeb({
+    	brand: decision.bestMatch?.brand || aiResult?.candidate?.brand || "",
+    	product: [
+ 	aiResult?.candidate?.product_name,
+  	aiResult?.candidate?.style,
+  	barcode
+	].filter(Boolean).join(" ")
+   });
+   }
 
     res.json({
       ok: true,

@@ -23,18 +23,24 @@ function scoreCandidates({ candidates, barcode, filters, aiResult }) {
     if (filters.category && includesLoose(c.category, filters.category)) {
       score += 10;
     }
+
+    if (c.source === "ai_vision") {
+    score += 40; // base trust for AI detection
+    }
     if (ai.brand && includesLoose(c.brand, ai.brand)) {
-      score += 10;
+    score += 25;
     }
     if (ai.product_name && includesLoose(c.product_name, ai.product_name)) {
-      score += 10;
+    score += 25;
     }
     if (ai.category && includesLoose(c.category, ai.category)) {
-      score += 5;
+    score += 15;
     }
+// 🔥 confidence boost
     if (ai.confidence) {
-      score += Math.round(Number(ai.confidence) * 10);
+    score += Math.round(Number(ai.confidence) * 20);
     }
+
     return {
       ...c,
       score
@@ -45,6 +51,17 @@ function buildDecision({ scored, aiResult, barcode }) {
   const ai = aiResult?.candidate || {};
   const top = scored[0];
   const second = scored[1];
+  
+  if (!scored.length && ai.brand) {
+  return {
+    status: "detected",
+    confidence: Math.round((Number(ai.confidence || 0)) * 100),
+    message: "AI detected product details",
+    bestMatch: ai,
+    alternatives: []
+  };
+}
+  
   if (!top) {
     return {
       status: "not_found",
@@ -54,7 +71,7 @@ function buildDecision({ scored, aiResult, barcode }) {
       alternatives: []
     };
   }
-  if (top.score >= 70 && (!second || top.score - second.score >= 15)) {
+  if (top.score >= 55) {
     return {
       status: "verified",
       confidence: Math.min(99, top.score),
@@ -63,7 +80,7 @@ function buildDecision({ scored, aiResult, barcode }) {
       alternatives: scored.slice(1, 4)
     };
   }
-  if (top.score >= 45 && second && Math.abs(top.score - second.score) < 15) {
+  if (top.score >= 35 && second) {
     return {
       status: "multiple",
       confidence: top.score,
