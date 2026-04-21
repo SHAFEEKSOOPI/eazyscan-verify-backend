@@ -150,4 +150,14 @@ res.json({
   }
 });
 
+  } catch (error) {
+  console.error("🔥 FULL ERROR:", error);
+  res.status(500).json({
+    ok: false,
+    status: "error",
+    message: error.message,
+    stack: error.stack   // 🔥 VERY IMPORTANT
+  });
+}
+});
 module.exports = router;
