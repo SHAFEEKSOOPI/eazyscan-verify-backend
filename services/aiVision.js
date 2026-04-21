@@ -10,51 +10,34 @@ async function analyzeImageWithAI({ imagePath }) {
     const base64Image = fs.readFileSync(imagePath, { encoding: "base64" });
 
     const response = await client.responses.create({
-      model: "gpt-4.1-mini",
-      input: [
+  model: "gpt-4.1-mini",
+  input: [
+    {
+      role: "user",
+      content: [
         {
-          role: "user",
-          content: [
-            {
-              type: "input_text",
-              text: `
+          type: "input_text",
+          text: `
 You are an advanced product recognition AI.
-
 Analyze this product label image carefully and extract:
-
-- brand (e.g. Calvin Klein, Nike, Zara)
-- product_name (e.g. T-Shirt, Shoes)
-- category (Clothing, Electronics, etc)
-- product_code (barcode or code if visible)
-- style (style number if present)
+- brand
+- product_name
+- category
+- product_code
+- style
 - color
-
-Important rules:
-- Brand may not be explicitly written — infer from text like "CK", "PVH", "Calvin Klein"
-- Extract best possible guess even if unclear
-- NEVER return empty JSON
-- If unsure, return closest possible value
-
-Return ONLY valid JSON in this format:
-
-{
-  "brand": "",
-  "product_name": "",
-  "category": "",
-  "product_code": "",
-  "style": "",
-  "color": ""
-}
+Return ONLY JSON.
 `
-            },
-            {
-              type: "input_image",
-              image_base64: base64Image
-            }
-          ]
+        },
+        {
+          type: "input_image",
+          image_url: `data:image/jpeg;base64,${base64Image}`
         }
       ]
-    });
+    }
+  ]
+});
+
 
     const text = response.output_text?.trim();
 
