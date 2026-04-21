@@ -13,19 +13,24 @@ function normalizeFilters(filters) {
     category: normalizeText(filters.category)
   };
 }
+// 🔥 STRONG BRAND NORMALIZATION
 function normalizeBrand(raw) {
   const text = (raw || "").toLowerCase();
+  // Calvin Klein (very important fix)
   if (
-    text.includes("pvh") ||
+    text.includes("calvin") ||
+    text.includes("klein") ||
     text.includes("ck") ||
-    text.includes("calvin")
+    text.includes("pvh") ||
+    text.includes("arvind")
   ) {
     return "Calvin Klein";
   }
   if (text.includes("nike")) return "Nike";
   if (text.includes("adidas")) return "Adidas";
   if (text.includes("zara")) return "Zara";
-  return raw;
+  if (text.includes("apple")) return "Apple";
+  return raw || "";
 }
 module.exports = {
   normalizeBarcode,
