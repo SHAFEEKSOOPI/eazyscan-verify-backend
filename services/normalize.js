@@ -18,3 +18,19 @@ module.exports = {
   normalizeFilters,
   normalizeText
 };
+
+function normalizeBrand(raw) {
+  const text = (raw || "").toLowerCase();
+
+  if (
+    text.includes("pvh") ||
+    text.includes("ck") ||
+    text.includes("calvin")
+  ) {
+    return "Calvin Klein";
+  }
+  if (text.includes("nike")) return "Nike";
+  if (text.includes("adidas")) return "Adidas";
+  if (text.includes("zara")) return "Zara";
+  return raw;
+}

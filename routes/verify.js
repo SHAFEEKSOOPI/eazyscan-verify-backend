@@ -81,17 +81,19 @@ router.post("/verify", upload.single("image"), async (req, res) => {
         });
       }
     }
-    if (aiResult?.candidate) {
-      candidates.push({
-        source: "ai_vision",
-        product_name: aiResult.candidate.product_name || "",
-        brand: aiResult.candidate.brand || "",
-        category: aiResult.candidate.category || "",
-        code: aiResult.candidate.code || barcode || "",
-        image_url: "",
-        raw: aiResult.candidate
-      });
-    }
+
+const { normalizeBrand } = require("../services/normalize");
+if (aiResult?.candidate) {
+  candidates.push({
+    source: "ai_vision",
+    product_name: aiResult.candidate.product_name || "",
+    brand: normalizeBrand(aiResult.candidate.brand),
+    category: aiResult.candidate.category || "",
+    code: aiResult.candidate.code || barcode || "",
+    image_url: "",
+    raw: aiResult.candidate
+  });
+}
     // ✅ scoring first
     const scored = scoreCandidates({
       candidates,
