@@ -4,7 +4,7 @@ const path = require("path");
 const fs = require("fs");
 const { analyzeImageWithAI } = require("../services/aiVision");
 const { lookupBarcode } = require("../services/barcodeLookup");
-const { normalizeFilters, normalizeBarcode } = require("../services/normalize");
+const { normalizeFilters, normalizeBarcode, normalizeBrand } = require("../services/normalize");
 const { scoreCandidates, buildDecision } = require("../services/scoring");
 const { prepareImageForAI } = require("../utils/imageTools");
 const { searchWeb } = require("../services/webSearch");
@@ -27,18 +27,18 @@ router.post("/verify", upload.single("image"), async (req, res) => {
   try {
     let imagePath = null;
     let preparedImage = null;
-    // ✅ handle base64 image
+    // ✅ base64 image
     if (req.body.image_base64) {
       const base64Data = req.body.image_base64.replace(/^data:image\/jpeg;base64,/, "");
       const filePath = path.join(uploadDir, `base64-${Date.now()}.jpg`);
       fs.writeFileSync(filePath, base64Data, "base64");
       imagePath = filePath;
     }
-    // ✅ handle file upload
+    // ✅ file upload
     if (req.file?.path) {
       imagePath = req.file.path;
     }
-    // ✅ prepare image for AI
+    // ✅ prepare image
     if (imagePath) {
       preparedImage = await prepareImageForAI(imagePath);
     }
@@ -53,7 +53,7 @@ router.post("/verify", upload.single("image"), async (req, res) => {
     });
     const barcode = normalizeBarcode(rawBarcode || req.body.code || "");
     const qr = String(rawQr || "").trim();
-    // 🔍 AI + Barcode parallel
+    // 🔍 AI + Barcode
     const [aiResult, barcodeResult] = await Promise.all([
       preparedImage
         ? analyzeImageWithAI({
@@ -68,6 +68,7 @@ router.post("/verify", upload.single("image"), async (req, res) => {
         : Promise.resolve({ found: false, candidates: [] })
     ]);
     const candidates = [];
+    // ✅ Barcode candidates
     if (barcodeResult?.candidates?.length) {
       for (const item of barcodeResult.candidates) {
         candidates.push({
@@ -81,20 +82,19 @@ router.post("/verify", upload.single("image"), async (req, res) => {
         });
       }
     }
-
-const { normalizeBrand } = require("../services/normalize");
-if (aiResult?.candidate) {
-  candidates.push({
-    source: "ai_vision",
-    product_name: aiResult.candidate.product_name || "",
-    brand: normalizeBrand(aiResult.candidate.brand),
-    category: aiResult.candidate.category || "",
-    code: aiResult.candidate.code || barcode || "",
-    image_url: "",
-    raw: aiResult.candidate
-  });
-}
-    // ✅ scoring first
+    // ✅ AI candidate
+    if (aiResult?.candidate) {
+      candidates.push({
+        source: "ai_vision",
+        product_name: aiResult.candidate.product_name || "",
+        brand: normalizeBrand(aiResult.candidate.brand),
+        category: aiResult.candidate.category || "",
+        code: aiResult.candidate.code || barcode || "",
+        image_url: "",
+        raw: aiResult.candidate
+      });
+    }
+    // ✅ scoring
     const scored = scoreCandidates({
       candidates,
       barcode,
@@ -102,7 +102,7 @@ if (aiResult?.candidate) {
       filters,
       aiResult
     });
-    // ✅ decision AFTER scoring
+    // ✅ decision
     const decision = buildDecision({
       scored,
       barcode,
@@ -111,56 +111,82 @@ if (aiResult?.candidate) {
       aiResult,
       barcodeResult
     });
-
-let webLinks = [];
-const searchBrand =
-  decision.bestMatch?.brand ||
-  aiResult?.candidate?.brand ||
-  "";
-const searchProduct =
-  decision.bestMatch?.product_name ||
-  aiResult?.candidate?.product_name ||
-  barcode ||
-  "";
-if (searchBrand || searchProduct) {
-  webLinks = await searchWeb({
-    brand: searchBrand,
-    product: searchProduct
-  });
-}
-
-console.log("WEB LINKS:", webLinks);
-
-res.json({
-  ok: true,
-  status: decision.status,
-  confidence: decision.confidence,
-  authenticity: decision.status === "verified" ? "AUTHENTIC ✅" : "NOT VERIFIED ⚠️",
-  best_match: decision.bestMatch,
-  alternatives: decision.alternatives,
-  // 🔥 NEW
-  web_links: webLinks,
-  // 🔥 NEW (image source priority)
-  images: [
-    decision.bestMatch?.image_url || "",
-    ...webLinks.map(w => w.image || "").filter(Boolean)
-  ].filter(Boolean),
-  extracted: {
-    barcode,
-    qr,
-    filters,
-    ai: aiResult || null
-  }
-});
-
+    // =========================
+    // 🔥 SEARCH QUERY
+    // =========================
+    const searchBrand =
+      decision.bestMatch?.brand ||
+      aiResult?.candidate?.brand ||
+      "";
+    const searchProduct =
+      decision.bestMatch?.product_name ||
+      aiResult?.candidate?.product_name ||
+      barcode ||
+      "";
+    // =========================
+    // 🔥 WEB SEARCH
+    // =========================
+    let webLinks = [];
+    if (searchBrand || searchProduct) {
+      webLinks = await searchWeb({
+        brand: searchBrand,
+        product: searchProduct
+      });
+    }
+    // ✅ fallback links (VERY IMPORTANT)
+    if (!webLinks.length && searchProduct) {
+      webLinks = [
+        {
+          title: "Search on Google",
+          url: `https://www.google.com/search?q=${encodeURIComponent(searchBrand + " " + searchProduct)}`
+        },
+        {
+          title: "View Images",
+          url: `https://www.google.com/search?tbm=isch&q=${encodeURIComponent(searchBrand + " " + searchProduct)}`
+        }
+      ];
+    }
+    console.log("WEB LINKS:", webLinks);
+    // =========================
+    // 🔥 IMAGE FIX
+    // =========================
+    const productImage =
+      decision.bestMatch?.image_url ||
+      barcodeResult?.candidates?.[0]?.image_url ||
+      "";
+    const fallbackImage =
+      productImage ||
+      `https://source.unsplash.com/400x400/?${encodeURIComponent(searchProduct)}`;
+    // =========================
+    // ✅ RESPONSE
+    // =========================
+    res.json({
+      ok: true,
+      status: decision.status,
+      confidence: decision.confidence,
+      authenticity:
+        decision.status === "verified"
+          ? "AUTHENTIC ✅"
+          : "NOT VERIFIED ⚠️",
+      best_match: decision.bestMatch,
+      alternatives: decision.alternatives,
+      web_links: webLinks,
+      images: [fallbackImage],
+      extracted: {
+        barcode,
+        qr,
+        filters,
+        ai: aiResult || null
+      }
+    });
   } catch (error) {
-  console.error("🔥 FULL ERROR:", error);
-  res.status(500).json({
-    ok: false,
-    status: "error",
-    message: error.message,
-    stack: error.stack   // 🔥 VERY IMPORTANT
-  });
-}
+    console.error("🔥 FULL ERROR:", error);
+    res.status(500).json({
+      ok: false,
+      status: "error",
+      message: error.message,
+      stack: error.stack
+    });
+  }
 });
 module.exports = router;
