@@ -128,32 +128,26 @@ if (aiResult?.candidate) {
    });
    }
 
-    res.json({
-      ok: true,
-      status: decision.status,
-      confidence: decision.confidence,
-      message:
-      decision.status === "not_found"
-         ? "⚠️ Product not verified. Showing similar results from web."
-         : decision.message,
-      best_match: decision.bestMatch,
-      alternatives: decision.alternatives,
-      web_links: webLinks,
-      extracted: {
-        barcode,
-        qr,
-        filters,
-        ai: aiResult || null
-      }
-    });
-  } catch (error) {
-  console.error("🔥 FULL ERROR:", error);
-  res.status(500).json({
-    ok: false,
-    status: "error",
-    message: error.message,
-    stack: error.stack   // 🔥 VERY IMPORTANT
-  });
-}
+res.json({
+  ok: true,
+  status: decision.status,
+  confidence: decision.confidence,
+  authenticity: decision.status === "verified" ? "AUTHENTIC ✅" : "NOT VERIFIED ⚠️",
+  best_match: decision.bestMatch,
+  alternatives: decision.alternatives,
+  // 🔥 NEW
+  web_links: webLinks,
+  // 🔥 NEW (image source priority)
+  images: [
+    decision.bestMatch?.image_url || "",
+    ...webLinks.map(w => w.image || "").filter(Boolean)
+  ].filter(Boolean),
+  extracted: {
+    barcode,
+    qr,
+    filters,
+    ai: aiResult || null
+  }
 });
+
 module.exports = router;
