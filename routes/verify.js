@@ -112,21 +112,24 @@ if (aiResult?.candidate) {
       barcodeResult
     });
 
-    let webLinks = [];
-	if (
-  	decision.bestMatch ||
-  	aiResult?.candidate?.product_name ||
-  	barcode
-	) {
-  	webLinks = await searchWeb({
-    	brand: decision.bestMatch?.brand || aiResult?.candidate?.brand || "",
-    	product: [
- 	aiResult?.candidate?.product_name,
-  	aiResult?.candidate?.style,
-  	barcode
-	].filter(Boolean).join(" ")
-   });
-   }
+let webLinks = [];
+const searchBrand =
+  decision.bestMatch?.brand ||
+  aiResult?.candidate?.brand ||
+  "";
+const searchProduct =
+  decision.bestMatch?.product_name ||
+  aiResult?.candidate?.product_name ||
+  barcode ||
+  "";
+if (searchBrand || searchProduct) {
+  webLinks = await searchWeb({
+    brand: searchBrand,
+    product: searchProduct
+  });
+}
+
+console.log("WEB LINKS:", webLinks);
 
 res.json({
   ok: true,

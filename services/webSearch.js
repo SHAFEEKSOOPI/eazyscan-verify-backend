@@ -1,7 +1,14 @@
 const axios = require("axios");
 async function searchWeb({ brand, product }) {
   if (!brand && !product) return [];
-  const query = `${brand || ""} ${product || ""} official product`;
+  const query = [
+  brand,
+  product,
+  "official",
+  "buy",
+  "product"
+].filter(Boolean).join(" ");
+
   const url = `https://duckduckgo.com/html/?q=${encodeURIComponent(query)}`;
   try {
     const { data } = await axios.get(url);
