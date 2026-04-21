@@ -111,22 +111,7 @@ router.post("/verify", upload.single("image"), async (req, res) => {
       aiResult,
       barcodeResult
     });
-    // =========================
-    // 🔥 SEARCH QUERY
-    // =========================
-    const searchBrand =
-      decision.bestMatch?.brand ||
-      aiResult?.candidate?.brand ||
-      "";
-    const searchProduct =
-      decision.bestMatch?.product_name ||
-      aiResult?.candidate?.product_name ||
-      barcode ||
-      "";
-    // =========================
-    // 🔥 WEB SEARCH
-    // =========================
-    let webLinks = [];
+let webLinks = [];
 let images = [];
 const searchBrand =
   decision.bestMatch?.brand ||
