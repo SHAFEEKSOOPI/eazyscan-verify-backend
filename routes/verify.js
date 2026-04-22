@@ -98,56 +98,36 @@ router.post("/verify", upload.single("image"), async (req, res) => {
     if (!images.length) {
       images.push(`https://source.unsplash.com/600x400/?${encodeURIComponent(bestMatch.product_name)}`);
     }
-    // =========================
-    // 🔥 PRO SEARCH ENGINE (FIX 5C)
-    // =========================
-    const baseQuery = `${bestMatch.brand} ${bestMatch.product_name} ${bestMatch.code}`.trim();
-    const webLinks = [
-      {
-        title: "Official Brand",
-        url: `https://www.google.com/search?q=site:${bestMatch.brand.replace(/\s+/g, "").toLowerCase()}.com+${encodeURIComponent(baseQuery)}`
-      },
-      {
-        title: "Amazon",
-        url: `https://www.google.com/search?q=site:amazon.in+${encodeURIComponent(baseQuery)}`
-      },
-      {
-        title: "Myntra",
-        url: `https://www.google.com/search?q=site:myntra.com+${encodeURIComponent(baseQuery)}`
-      },
-      {
-        title: "Flipkart",
-        url: `https://www.google.com/search?q=site:flipkart.com+${encodeURIComponent(baseQuery)}`
-      },
-      {
-        title: "Noon",
-        url: `https://www.google.com/search?q=site:noon.com+${encodeURIComponent(baseQuery)}`
-      },
-      {
-        title: "eBay",
-        url: `https://www.google.com/search?q=site:ebay.com+${encodeURIComponent(baseQuery)}`
-      },
-      {
-        title: "View Images",
-        url: `https://www.google.com/search?tbm=isch&q=${encodeURIComponent(baseQuery)}`
-      }
-    ];
-    // =========================
-    // ✅ FINAL RESPONSE
-    // =========================
-    res.json({
-      ok: true,
-      status: "verified",
-      confidence: 97,
-      authenticity: "AUTHENTIC ✅",
-      best_match: bestMatch,
-      images,
-      web_links: webLinks,
-      extracted: {
-        barcode,
-        ai: aiResult || null
-      }
-    });
+// =========================
+// 🔥 CLEAN PRODUCT OUTPUT
+// =========================
+const baseQuery = `${bestMatch.brand} ${bestMatch.product_name} ${bestMatch.code}`.trim();
+// ✅ ONE SMART SEARCH LINK
+const explore_link = `https://www.google.com/search?q=${encodeURIComponent(baseQuery)}`;
+// ✅ BEST PRODUCT LINK (priority)
+let product_link =
+  bestMatch.product_url ||
+  `https://www.google.com/search?q=site:${bestMatch.brand.replace(/\s+/g,"").toLowerCase()}.com+${encodeURIComponent(baseQuery)}`;
+// =========================
+// ✅ FINAL RESPONSE
+// =========================
+res.json({
+  ok: true,
+  status: "verified",
+  confidence: 97,
+  authenticity: "AUTHENTIC ✅",
+  best_match: bestMatch,
+  // 🔥 CLEAN DATA
+  product_link,
+  explore_link,
+  price_range: bestMatch.price || null,
+  images,
+  extracted: {
+    barcode,
+    ai: aiResult || null
+  }
+});
+
   } catch (error) {
     console.error("🔥 FULL ERROR:", error);
     res.status(500).json({
