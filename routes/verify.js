@@ -4,7 +4,7 @@ const path = require("path");
 const fs = require("fs");
 const { analyzeImageWithAI } = require("../services/aiVision");
 const { lookupBarcode } = require("../services/barcodeLookup");
-const { normalizeFilters, normalizeBarcode, normalizeBrand } = require("../services/normalize");
+const { normalizeBarcode, normalizeBrand } = require("../services/normalize");
 const { prepareImageForAI } = require("../utils/imageTools");
 const router = express.Router();
 const uploadDir = path.join(__dirname, "..", "uploads");
@@ -54,10 +54,10 @@ router.post("/verify", upload.single("image"), async (req, res) => {
         : Promise.resolve({ found: false, candidates: [] })
     ]);
     // =========================
-    // 🔥 FIXED LOGIC (STABLE)
+    // 🔥 PRODUCT DETECTION
     // =========================
     let bestMatch = null;
-    // 🔥 PRIORITY 1 → BARCODE (MOST RELIABLE)
+    // 🔥 PRIORITY 1 → BARCODE
     if (barcodeResult?.candidates?.length) {
       const item = barcodeResult.candidates[0];
       bestMatch = {
@@ -69,7 +69,7 @@ router.post("/verify", upload.single("image"), async (req, res) => {
         product_url: item.product_url || ""
       };
     }
-    // 🔥 PRIORITY 2 → AI (ONLY IF BARCODE FAILS)
+    // 🔥 PRIORITY 2 → AI
     if (!bestMatch && aiResult?.candidate) {
       bestMatch = {
         product_name: aiResult.candidate.product_name || "Unknown Product",
@@ -79,7 +79,7 @@ router.post("/verify", upload.single("image"), async (req, res) => {
         image_url: ""
       };
     }
-    // 🔥 FINAL FALLBACK
+    // 🔥 FALLBACK
     if (!bestMatch) {
       bestMatch = {
         product_name: "Unknown Product",
@@ -89,30 +89,47 @@ router.post("/verify", upload.single("image"), async (req, res) => {
       };
     }
     // =========================
-    // 🔥 ALWAYS SHOW IMAGE
+    // 🔥 IMAGE FIX (NO BROKEN IMAGE)
     // =========================
     let images = [];
-    if (bestMatch.image_url) {
+    if (bestMatch.image_url && bestMatch.image_url.startsWith("http")) {
       images.push(bestMatch.image_url);
     }
-    // fallback image
     if (!images.length) {
-      images.push("https://via.placeholder.com/400x300?text=No+Image");
+      images.push(`https://source.unsplash.com/600x400/?${encodeURIComponent(bestMatch.product_name)}`);
     }
     // =========================
-    // 🔥 ALWAYS WORKING LINKS
+    // 🔥 PRO SEARCH ENGINE (FIX 5C)
     // =========================
-    const query = encodeURIComponent(
-      `${bestMatch.brand} ${bestMatch.product_name} ${barcode}`
-    );
+    const baseQuery = `${bestMatch.brand} ${bestMatch.product_name} ${bestMatch.code}`.trim();
     const webLinks = [
       {
-        title: "Search Product",
-        url: `https://www.google.com/search?q=${query}`
+        title: "Official Brand",
+        url: `https://www.google.com/search?q=site:${bestMatch.brand.replace(/\s+/g, "").toLowerCase()}.com+${encodeURIComponent(baseQuery)}`
+      },
+      {
+        title: "Amazon",
+        url: `https://www.google.com/search?q=site:amazon.in+${encodeURIComponent(baseQuery)}`
+      },
+      {
+        title: "Myntra",
+        url: `https://www.google.com/search?q=site:myntra.com+${encodeURIComponent(baseQuery)}`
+      },
+      {
+        title: "Flipkart",
+        url: `https://www.google.com/search?q=site:flipkart.com+${encodeURIComponent(baseQuery)}`
+      },
+      {
+        title: "Noon",
+        url: `https://www.google.com/search?q=site:noon.com+${encodeURIComponent(baseQuery)}`
+      },
+      {
+        title: "eBay",
+        url: `https://www.google.com/search?q=site:ebay.com+${encodeURIComponent(baseQuery)}`
       },
       {
         title: "View Images",
-        url: `https://www.google.com/search?tbm=isch&q=${query}`
+        url: `https://www.google.com/search?tbm=isch&q=${encodeURIComponent(baseQuery)}`
       }
     ];
     // =========================
