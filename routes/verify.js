@@ -69,6 +69,19 @@ router.post("/verify", upload.single("image"), async (req, res) => {
         product_url: item.product_url || ""
       };
     }
+
+if (bestMatch.brand === "Apple") {
+  bestMatch.product_name = "iPhone";
+  // basic detection
+  if (barcode.includes("15")) {
+    bestMatch.model = "iPhone 15";
+    bestMatch.year = "2023";
+  } else if (barcode.includes("14")) {
+    bestMatch.model = "iPhone 14";
+    bestMatch.year = "2022";
+  }
+}
+
     // 🔥 PRIORITY 2 → AI
     if (!bestMatch && aiResult?.candidate) {
       bestMatch = {
@@ -91,13 +104,21 @@ router.post("/verify", upload.single("image"), async (req, res) => {
     // =========================
     // 🔥 IMAGE FIX (NO BROKEN IMAGE)
     // =========================
-    let images = [];
-    if (bestMatch.image_url && bestMatch.image_url.startsWith("http")) {
-      images.push(bestMatch.image_url);
-    }
-    if (!images.length) {
-      images.push(`https://source.unsplash.com/600x400/?${encodeURIComponent(bestMatch.product_name)}`);
-    }
+let images = [];
+  if (bestMatch.image_url && bestMatch.image_url.startsWith("http")) {
+  images.push(bestMatch.image_url);
+}
+
+// fallback to Google image preview (REAL FIX)
+if (!images.length) {
+  images.push(`https://www.google.com/search?tbm=isch&q=${encodeURIComponent(baseQuery)}`);
+}
+
+let price_range = null;
+  if (webLinks.length) {
+  price_range = "Check in product page";
+}
+
 // =========================
 // 🔥 CLEAN PRODUCT OUTPUT
 // =========================
@@ -107,7 +128,9 @@ const explore_link = `https://www.google.com/search?q=${encodeURIComponent(baseQ
 // ✅ BEST PRODUCT LINK (priority)
 let product_link =
   bestMatch.product_url ||
-  `https://www.google.com/search?q=site:${bestMatch.brand.replace(/\s+/g,"").toLowerCase()}.com+${encodeURIComponent(baseQuery)}`;
+  `https://www.google.com/search?q=${encodeURIComponent(baseQuery + " buy official")}`;
+
+
 // =========================
 // ✅ FINAL RESPONSE
 // =========================
