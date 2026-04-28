@@ -31,8 +31,7 @@ router.post("/verify", upload.single("image"), async (req, res) => {
   console.log("🔥 VERIFY API HIT");
 
   try {
-    const isDeepSearch = req.body.deep === true; // ✅ FIXED LOCATION
-
+    
     let imagePath = null;
     let preparedImage = null;
 
@@ -56,6 +55,7 @@ router.post("/verify", upload.single("image"), async (req, res) => {
 
     const rawBarcode = req.body.barcode || "";
     const barcode = normalizeBarcode(rawBarcode || "");
+    const isDeepSearch = req.body.deep === true; // 
 
     // 🔍 AI + Barcode
     const [aiResult, barcodeResult] = await Promise.all([
@@ -155,30 +155,41 @@ router.post("/verify", upload.single("image"), async (req, res) => {
     }
 
     // 🔴 DEEP MODE
-    if (isDeepSearch) {
-      const serp = await searchProduct({ query: baseQuery });
-
-      product_link =
-        bestMatch.product_url ||
-        serp.best_link ||
-        `https://www.google.com/search?q=${encodeURIComponent(baseQuery)}`;
-
-      explore_link = `https://www.google.com/search?q=${encodeURIComponent(baseQuery)}`;
-
-      if (bestMatch.image_url && bestMatch.image_url.startsWith("http")) {
-        images.push(bestMatch.image_url);
-      }
-
-      if (serp.images?.length) {
-        images.push(...serp.images.map(i => i.url));
-      }
-
-      if (!images.length) {
-        images.push("https://via.placeholder.com/400x300?text=No+Image");
-      }
-
-      price_range = serp.price || "Not available";
+if (isDeepSearch) {
+  console.log("🚀 DEEP SEARCH MODE");
+  const baseQuery = `${bestMatch.brand} ${bestMatch.product_name} ${bestMatch.code}`.trim();
+  const serp = await searchProduct({ query: baseQuery });
+  // ✅ product link
+  product_link =
+    bestMatch.product_url ||
+    serp.best_link ||
+    `https://www.google.com/search?q=${encodeURIComponent(baseQuery)}`;
+  // ✅ images
+  images = [];
+  if (bestMatch.image_url && bestMatch.image_url.startsWith("http")) {
+    images.push(bestMatch.image_url);
+  }
+  if (serp.images?.length) {
+    images.push(...serp.images.map(i => i.url));
+  }
+  if (!images.length) {
+    images.push("https://via.placeholder.com/400x300?text=No+Image");
+  }
+  // ✅ price
+  price_range = serp.price || "Not available";
+  // ✅ model / year (basic improvement)
+  if (bestMatch.brand === "Apple") {
+    if (baseQuery.includes("15")) {
+      bestMatch.model = "iPhone 15";
+      bestMatch.year = "2023";
+    } else if (baseQuery.includes("14")) {
+      bestMatch.model = "iPhone 14";
+      bestMatch.year = "2022";
     }
+  }
+  explore_link = `https://www.google.com/search?q=${encodeURIComponent(baseQuery)}`;
+}
+
 
     // =========================
     // ✅ FINAL RESPONSE
