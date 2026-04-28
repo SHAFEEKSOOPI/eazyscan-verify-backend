@@ -7,6 +7,7 @@ const { analyzeImageWithAI } = require("../services/aiVision");
 const { lookupBarcode } = require("../services/barcodeLookup");
 const { normalizeBarcode, normalizeBrand } = require("../services/normalize");
 const { prepareImageForAI } = require("../utils/imageTools");
+const { searchProduct } = require("../services/serpSearch"); // ✅ IMPORTANT
 
 const router = express.Router();
 
@@ -30,6 +31,8 @@ router.post("/verify", upload.single("image"), async (req, res) => {
   console.log("🔥 VERIFY API HIT");
 
   try {
+    const isDeepSearch = req.body.deep === true; // ✅ FIXED LOCATION
+
     let imagePath = null;
     let preparedImage = null;
 
@@ -71,7 +74,6 @@ router.post("/verify", upload.single("image"), async (req, res) => {
 
     let bestMatch = null;
 
-    // 🔥 PRIORITY 1 → BARCODE
     if (barcodeResult?.candidates?.length) {
       const item = barcodeResult.candidates[0];
 
@@ -85,7 +87,6 @@ router.post("/verify", upload.single("image"), async (req, res) => {
       };
     }
 
-    // 🔥 PRIORITY 2 → AI
     if (!bestMatch && aiResult?.candidate) {
       bestMatch = {
         product_name: aiResult.candidate.product_name || "Unknown Product",
@@ -96,7 +97,6 @@ router.post("/verify", upload.single("image"), async (req, res) => {
       };
     }
 
-    // 🔥 FALLBACK
     if (!bestMatch) {
       bestMatch = {
         product_name: "Unknown Product",
@@ -107,7 +107,7 @@ router.post("/verify", upload.single("image"), async (req, res) => {
     }
 
     // =========================
-    // 🍏 APPLE FIX (SAFE PLACE)
+    // 🍏 APPLE FIX
     // =========================
 
     if (bestMatch && bestMatch.brand === "Apple") {
@@ -123,39 +123,61 @@ router.post("/verify", upload.single("image"), async (req, res) => {
     }
 
     // =========================
-    // 🖼 IMAGE FIX
+    // 🔥 SEARCH MODES
     // =========================
 
+    let product_link = null;
+    let explore_link = null;
     let images = [];
-
-    if (bestMatch.image_url && bestMatch.image_url.startsWith("http")) {
-      images.push(bestMatch.image_url);
-    }
-
-    // fallback (REAL IMAGE, not link)
-    if (!images.length) {
-      images.push("https://via.placeholder.com/400x300?text=No+Image");
-    }
-
-    // =========================
-    // 🔍 SEARCH LINKS
-    // =========================
+    let price_range = null;
 
     const baseQuery = `${bestMatch.brand} ${bestMatch.product_name} ${bestMatch.code}`.trim();
 
-    const explore_link = `https://www.google.com/search?q=${encodeURIComponent(baseQuery)}`;
+    // 🟢 NORMAL MODE
+    if (!isDeepSearch) {
+      product_link =
+        bestMatch.product_url ||
+        `https://www.google.com/search?q=${encodeURIComponent(baseQuery + " official")}`;
 
-    const product_link =
-      bestMatch.product_url ||
-      `https://www.google.com/search?q=${encodeURIComponent(baseQuery + " official product")}`;
+      explore_link = `https://www.google.com/search?q=${encodeURIComponent(baseQuery)}`;
 
-    // =========================
-    // 💰 PRICE FIX
-    // =========================
+      if (bestMatch.image_url && bestMatch.image_url.startsWith("http")) {
+        images.push(bestMatch.image_url);
+      }
 
-    let price_range = null;
-    if (bestMatch.product_url) {
-      price_range = "Check on product page";
+      if (!images.length) {
+        images.push("https://via.placeholder.com/400x300?text=Basic+Preview");
+      }
+
+      if (bestMatch.product_url) {
+        price_range = "Check on product page";
+      }
+    }
+
+    // 🔴 DEEP MODE
+    if (isDeepSearch) {
+      const serp = await searchProduct({ query: baseQuery });
+
+      product_link =
+        bestMatch.product_url ||
+        serp.best_link ||
+        `https://www.google.com/search?q=${encodeURIComponent(baseQuery)}`;
+
+      explore_link = `https://www.google.com/search?q=${encodeURIComponent(baseQuery)}`;
+
+      if (bestMatch.image_url && bestMatch.image_url.startsWith("http")) {
+        images.push(bestMatch.image_url);
+      }
+
+      if (serp.images?.length) {
+        images.push(...serp.images.map(i => i.url));
+      }
+
+      if (!images.length) {
+        images.push("https://via.placeholder.com/400x300?text=No+Image");
+      }
+
+      price_range = serp.price || "Not available";
     }
 
     // =========================
@@ -173,12 +195,12 @@ router.post("/verify", upload.single("image"), async (req, res) => {
       product_link,
       explore_link,
       price_range,
-
       images,
 
       extracted: {
         barcode,
-        ai: aiResult || null
+        ai: aiResult || null,
+        deep_mode: isDeepSearch // ✅ FIXED
       }
     });
 
